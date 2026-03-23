@@ -4,36 +4,24 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import streamlit as st
 
-# -------------------------------
-# GENERATE OTP
-# -------------------------------
 def generate_otp(length=6):
-    return "".join([str(random.randint(0, 9)) for _ in range(length)])
+    return "".join([str(random.randint(0,9)) for _ in range(length)])
 
-# -------------------------------
-# SEND OTP EMAIL
-# -------------------------------
 def send_otp(to_email, otp):
-    """
-    Sends OTP to the user via Gmail SMTP
-    Optional: will skip if Gmail credentials not configured in Streamlit secrets
-    """
     try:
         GMAIL_USER = st.secrets.get("GMAIL_USER")
         GMAIL_PASSWORD = st.secrets.get("GMAIL_PASSWORD")
         if not GMAIL_USER or not GMAIL_PASSWORD:
             return False
-
         msg = MIMEMultipart()
         msg["From"] = GMAIL_USER
         msg["To"] = to_email
         msg["Subject"] = "Your OTP for Ultimate Secure Vault"
-        body = f"Your One-Time Password (OTP) is: {otp}"
-        msg.attach(MIMEText(body, "plain"))
-
-        server = smtplib.SMTP("smtp.gmail.com", 587)
+        body = f"Your OTP is: {otp}"
+        msg.attach(MIMEText(body,"plain"))
+        server = smtplib.SMTP("smtp.gmail.com",587)
         server.starttls()
-        server.login(GMAIL_USER, GMAIL_PASSWORD)
+        server.login(GMAIL_USER,GMAIL_PASSWORD)
         server.send_message(msg)
         server.quit()
         return True
