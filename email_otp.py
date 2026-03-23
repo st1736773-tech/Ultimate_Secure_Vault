@@ -1,38 +1,42 @@
 import random
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import streamlit as st
 
-# Gmail config (optional)
-GMAIL_USER = st.secrets.get("GMAIL_USER", None)
-GMAIL_PASSWORD = st.secrets.get("GMAIL_PASSWORD", None)
-
+# -------------------------------
+# GENERATE OTP
+# -------------------------------
 def generate_otp(length=6):
-    return ''.join([str(random.randint(0, 9)) for _ in range(length)])
+    return "".join([str(random.randint(0, 9)) for _ in range(length)])
 
-def send_otp(email, otp):
+# -------------------------------
+# SEND OTP EMAIL
+# -------------------------------
+def send_otp(to_email, otp):
     """
-    If Gmail is configured, send OTP.
-    If not, skip and print a warning.
+    Sends OTP to the user via Gmail SMTP
+    Optional: will skip if Gmail credentials not configured in Streamlit secrets
     """
-    if not GMAIL_USER or not GMAIL_PASSWORD:
-        st.warning("Gmail not configured — OTP skipped. Login will proceed without OTP.")
-        return True  # Treat as OTP "sent" so login works
     try:
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
+        GMAIL_USER = st.secrets.get("GMAIL_USER")
+        GMAIL_PASSWORD = st.secrets.get("GMAIL_PASSWORD")
+        if not GMAIL_USER or not GMAIL_PASSWORD:
+            return False
 
-        message = MIMEMultipart()
-        message['From'] = GMAIL_USER
-        message['To'] = email
-        message['Subject'] = "Your OTP for Ultimate Secure Vault"
-        message.attach(MIMEText(f"Your OTP is: {otp}", 'plain'))
+        msg = MIMEMultipart()
+        msg["From"] = GMAIL_USER
+        msg["To"] = to_email
+        msg["Subject"] = "Your OTP for Ultimate Secure Vault"
+        body = f"Your One-Time Password (OTP) is: {otp}"
+        msg.attach(MIMEText(body, "plain"))
 
-        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server = smtplib.SMTP("smtp.gmail.com", 587)
         server.starttls()
         server.login(GMAIL_USER, GMAIL_PASSWORD)
-        server.send_message(message)
+        server.send_message(msg)
         server.quit()
         return True
     except Exception as e:
-        st.warning(f"Failed to send OTP ({e}). Login will proceed without OTP.")
-        return True
+        print("Failed to send OTP:", e)
+        return False
