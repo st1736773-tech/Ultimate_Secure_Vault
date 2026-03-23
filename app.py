@@ -3,13 +3,7 @@ from db import create_tables, add_password, get_passwords, delete_password, get_
 from auth import register_user, login_user
 from crypto import generate_key, encrypt_password, decrypt_password
 from email_otp import generate_otp, send_otp
-from utils import (
-    check_password_strength,
-    generate_strong_password,
-    export_to_csv,
-    import_from_csv,
-    generate_encrypted_export,
-)
+from db import create_tables, add_password, get_passwords, delete_password, get_stats, add_to_history, toggle_favorite
 import time
 
 # -------------------------------
