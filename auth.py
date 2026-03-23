@@ -6,14 +6,11 @@ from db import DB_NAME
 # REGISTER USER
 # -------------------------------
 def register_user(email, password):
-    """
-    Registers a new user
-    Returns: (success: bool, message: str)
-    """
     if get_user(email):
         return False, "Email already registered"
 
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+    hashed = hashed.decode()  # Convert bytes → string before storing in SQLite
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("INSERT INTO users (email, password) VALUES (?, ?)", (email, hashed))
@@ -25,14 +22,11 @@ def register_user(email, password):
 # LOGIN USER
 # -------------------------------
 def login_user(email, password):
-    """
-    Logs in a user
-    Returns: (success: bool, message: str, user: tuple)
-    """
     user = get_user(email)
     if not user:
         return False, "Email not registered", None
-    stored_hash = user[2]  # user = (id, email, password)
+    stored_hash = user[2]  # db returns (id, email, password)
+    stored_hash = stored_hash.encode()  # Convert string → bytes before check
     if bcrypt.checkpw(password.encode(), stored_hash):
         return True, "Login successful", user
     else:
@@ -42,10 +36,6 @@ def login_user(email, password):
 # GET USER
 # -------------------------------
 def get_user(email):
-    """
-    Fetches user from DB by email
-    Returns: user tuple (id, email, password) or None
-    """
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE email = ?", (email,))
