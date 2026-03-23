@@ -1,138 +1,122 @@
 import sqlite3
-from datetime import datetime
 
 DB_NAME = "vault.db"
-
-
-# -------------------------------
-# DATABASE CONNECTION
-# -------------------------------
-def get_connection():
-    return sqlite3.connect(DB_NAME, check_same_thread=False)
-
 
 # -------------------------------
 # CREATE TABLES
 # -------------------------------
 def create_tables():
-    conn = get_connection()
-    cursor = conn.cursor()
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
 
-    # USERS TABLE
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        created_at TEXT
-    )
+    # Users table
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE,
+            password TEXT
+        )
     """)
 
-    # PASSWORD VAULT TABLE
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS vault (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        site TEXT,
-        username TEXT,
-        password TEXT,
-        created_at TEXT,
-        FOREIGN KEY(user_id) REFERENCES users(id)
-    )
+    # Vault table with category and favorite
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS vault (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            site TEXT,
+            username TEXT,
+            password TEXT,
+            category TEXT,
+            favorite INTEGER DEFAULT 0,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+
+    # Password history table
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            site TEXT,
+            username TEXT,
+            password TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
     """)
 
     conn.commit()
     conn.close()
 
-
 # -------------------------------
-# USER FUNCTIONS
+# ADD PASSWORD
 # -------------------------------
-def create_user(email, hashed_password):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute("""
-        INSERT INTO users (email, password, created_at)
-        VALUES (?, ?, ?)
-        """, (email, hashed_password, datetime.now().isoformat()))
-        conn.commit()
-        return True
-    except:
-        return False
-    finally:
-        conn.close()
-
-
-def get_user(email):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT * FROM users WHERE email=?", (email,))
-    user = cursor.fetchone()
-
-    conn.close()
-    return user
-
-
-# -------------------------------
-# VAULT FUNCTIONS
-# -------------------------------
-def add_password(user_id, site, username, encrypted_password):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    INSERT INTO vault (user_id, site, username, password, created_at)
-    VALUES (?, ?, ?, ?, ?)
-    """, (user_id, site, username, encrypted_password, datetime.now().isoformat()))
-
+def add_password(user_id, site, username, password, category="", favorite=0):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO vault (user_id, site, username, password, category, favorite)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (user_id, site, username, password, category, favorite))
     conn.commit()
     conn.close()
 
-
+# -------------------------------
+# GET PASSWORDS
+# -------------------------------
 def get_passwords(user_id):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    SELECT id, site, username, password, created_at
-    FROM vault WHERE user_id=?
-    """, (user_id,))
-
-    data = cursor.fetchall()
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT * FROM vault WHERE user_id = ?", (user_id,))
+    data = c.fetchall()
     conn.close()
     return data
 
-
-def delete_password(entry_id, user_id):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    DELETE FROM vault WHERE id=? AND user_id=?
-    """, (entry_id, user_id))
-
+# -------------------------------
+# DELETE PASSWORD
+# -------------------------------
+def delete_password(password_id, user_id):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("DELETE FROM vault WHERE id = ? AND user_id = ?", (password_id, user_id))
     conn.commit()
     conn.close()
 
-
 # -------------------------------
-# DASHBOARD STATS
+# GET DASHBOARD STATS
 # -------------------------------
 def get_stats(user_id):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT COUNT(*) FROM vault WHERE user_id=?", (user_id,))
-    total = cursor.fetchone()[0]
-
-    cursor.execute("""
-    SELECT COUNT(*) FROM vault
-    WHERE user_id=? AND LENGTH(password) < 12
-    """, (user_id,))
-    weak = cursor.fetchone()[0]
-
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM vault WHERE user_id = ?", (user_id,))
+    total = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM vault WHERE user_id = ? AND LENGTH(password) < 8", (user_id,))
+    weak = c.fetchone()[0]
     conn.close()
     return total, weak
+
+# -------------------------------
+# ADD TO HISTORY
+# -------------------------------
+def add_to_history(user_id, site, username, password):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO history (user_id, site, username, password)
+        VALUES (?, ?, ?, ?)
+    """, (user_id, site, username, password))
+    conn.commit()
+    conn.close()
+
+# -------------------------------
+# TOGGLE FAVORITE
+# -------------------------------
+def toggle_favorite(password_id, user_id):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT favorite FROM vault WHERE id = ? AND user_id = ?", (password_id, user_id))
+    current = c.fetchone()
+    if current:
+        new_val = 0 if current[0] == 1 else 1
+        c.execute("UPDATE vault SET favorite = ? WHERE id = ? AND user_id = ?", (new_val, password_id, user_id))
+        conn.commit()
+    conn.close()
